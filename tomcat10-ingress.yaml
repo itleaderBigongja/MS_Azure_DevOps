@@ -1,0 +1,21 @@
+# tomcat10-ingress.yaml 파일 시작
+apiVersion: networking.k8s.io/v1    # networking.k8s.io/v1은 Ingress 리소스의 현재 표준 API 그룹 및 버전입니다.
+kind: Ingress                       # kind: 생성하려는 Kubernetes 오브젝트의 종류( 'Ingress' ) 리소스를 생성
+metadata:                           # metadata: 오브젝트에 대한 메타데이터(이름, 레이블, 어노테이션 등)을 정의
+  name: tomcat10-web-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tomcat10-service
+            port:
+              number: 80
+
+# tomcat10-ingress.yaml 파일 끝

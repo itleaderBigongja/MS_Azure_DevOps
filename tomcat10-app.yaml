@@ -1,0 +1,74 @@
+# tomcat10-app.yaml 파일 시작
+# Deployment 정의 : Tomcat 애플리케이션의 Pod들을 관리합니다.
+apiVersion: apps/v1 # API 버전(Kubernetes API 서버의 apps/v1 그룹 사용)
+kind: Deployment    # 리소스 종류 : Deployment( 애플리케이션의 롤링 업데이트, 복제본(Pod) 관리 등 담당 )
+metadata:
+  name: tomcat10-deployment # Deployment의 이름( Kubernetes 리소스에 부여하는 고유 이름 )
+  labels:                   # Deployment에 붙일 레이블(식별자, kubectl 명령이나 Service에서 Pod를 찾을 때 사용 )
+    app: tomcat10-app       # 애플리케이션 이름 레이블
+spec:
+  replicas: 2               # 요청하신 대로 Tomcat 파드 2개 생성( AKS의 두 노드에 각각 1개씩 배포될 수 있습니다. )
+  selector:                 # 어떤 Pod들을 관리할지 선택하는 기준
+    matchLabels:
+      app: tomcat10-app     # 'app: tomcat10-app' 레이블을 가진 Pod들을 선택합니다.
+  template:                 # Pod 템플릿: 실제로 생성될 Pod의 구성( 이 템플릿에 따라 Pod들이 생성됩니다. )
+    metadata:
+      labels:               # Pod에 붙일 레이블( selector와 일치해야 합니다. )
+        app: tomcat10-app
+    spec:
+      containers:           # Pod 내에서 실행될 컨테이너 목록
+      - name: tomcat-app-container # 컨테이너 이름( Pod 내에서 컨테이너를 식별하는 이름)
+        # 사용할 Docker 이미지 경로를 지정합니다.
+        # 4단계에서 ACR에 푸시한 이미지 경로로 변경해야 합니다.
+        # 예시: takaksingressacr.azurecr.io/tak-tomcat10-app:1.0
+        image: takaksingressacr.azurecr.io/tak-tomcat10-app:1.2
+        ports:
+          - containerPort: 8080 # Tomcat 컨테이너가 리스닝하는 포트입니다.( Dockerfile EXPOSE와 일치 )
+        resources:              # 컨테이너가 사용할 CPU/메모리 리소스 요청 및 제한 설정( 무료계정 필수! )
+          requests:             # 컨테이너가 최소한으로 요청하는 리소스. AKS 스케줄러가 Pod를 배치할 때 참고합니다.
+            memory: "256Mi"     # 256 메가바이트 메모리 요청
+            cpu: "250m"         # 0.25 vCPU 요청( 1000m = 1 vCPU. 노드에 충분한 리소스가 있어야 Pod가 스케줄링됩니다. )
+          limits:               # 컨테이너가 최대로 사용할 수 있는 리소스. 이 이상 사용 시 종료될 수 있습니다.
+            memory: "512Mi"     # 512 메가바이트 메모리 제한
+            cpu: "500m"         # 0.5 vCPU 제한(이 제한을 초과하면 컨테이너가 종료될 수 있습니다.)
+        env:
+          - name: JDBC_URL
+            valueFrom:
+              secretKeyRef:
+                name: sql-connection-secret # DB Secret 이름
+                key: JDBC_URL # DB Secret 내의 URL(Host) Key 이름
+          - name: DB_USER
+            valueFrom:
+              secretKeyRef:
+                name: sql-connection-secret # DB Secret 이름
+                key: DB_USER  # DB Secret 내의 USER Key 이름
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: sql-connection-secret # DB Secret 이름
+                key: DB_PASSWORD
+      # 애플리케이션 코드(JSP/Java)에서 위 환경 변수들을 사용하여 DB 연결을 구성해야 한다.
+      imagePullSecrets:
+        - name: acr-pull-secret # ACR 관리자의 정보를 저장한 Secret
+
+---
+
+# Service 정의: Tomcat Pod들에 대한 내부 접근을 제공합니다.
+# 이 서비스는 Deployment의 Pod들을 묶어 하나의 논리적인 엔드포인트로 만듭니다.
+# 클라이언트(Ingress Controller 등)는 이 Service의 IP와 포트를 통해 Pod에 접근합니다.
+apiVersion: v1      # API 버전( Kubernetes API 서버 v1 그룹 사용 )
+kind: Service       # 리소스 종류: Service( 네트워크 접근을 추상화하는 역할 )
+metadata:
+  name: tomcat10-service  # Service의 이름
+spec:
+  selector:           # 어떤 Pod들을 대상으로 할지 선택하는 기준( Deployment의 Pod 레이블과 일치)
+    app: tomcat10-app
+  ports:
+    - protocol: TCP   # TCP 프로토콜 사용
+      port: 80        # Service가 노출하는 포트( 클러스터 내부에서 이 포트로 Service에 접근. Ingress도 이 포트로 접근합니다.)
+      targetPort: 8080 # Service가 트래픽을 전달할 Pod의 포트( Tomcat 컨테이너의 8080 포트)
+  type: ClusterIP     # Service 타입: 클러스터 내부에서만 접근 가능한 IP 주소를 할당합니다.
+                      # 외부에서는 직접 접근할 수 없습니다. Ingress를 통해 외부 트래픽을 라우팅할 것이므로
+                      # LoadBalancer 타입이 필요 없습니다.
+
+# tomcat10-app.yaml 파일 끝
