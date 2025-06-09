@@ -1,0 +1,28 @@
+# CI (Continuous Integration) Build Pipeline - for JSP/HTML (No Maven)
+# 이 파이프라인은 GitHub의 'master' 브랜치에 코드가 푸시될 때마다 자동으로 실행됩니다.
+trigger:
+- master # 여러분의 브랜치 이름이 'master'이므로 여기에 'master'를 입력합니다.
+
+# 파이프라인이 실행될 가상 머신(에이전트) 환경을 정의합니다.
+pool:
+  vmImage: 'ubuntu-latest'
+
+# 파이프라인 전체에서 재사용할 수 있는 변수들을 정의합니다.
+variables:
+  azureContainerRegistry: 'takaksingressacr.azurecr.io' # 여러분의 ACR 로그인 서버 주소 (takaksingressacr.azurecr.io)
+  imageName: 'tak-tomcat10-app' # ACR에 저장될 Docker 이미지 이름
+  tag: '$(Build.BuildId)' # 이미지 태그를 Azure DevOps 빌드 ID로 설정 (매 빌드마다 고유한 번호가 매겨집니다. 예: 1, 2, 3...)
+  dockerfilePath: 'Dockerfile' # Dockerfile의 정확한 경로. GitHub 리포지토리 루트에 있으므로 'Dockerfile' 그대로 사용합니다.
+
+# 파이프라인에서 순서대로 실행될 작업(steps)들을 정의합니다.
+steps:
+- task: Docker@2 # Docker 명령어를 실행하기 위한 내장 태스크 (버전 2)
+  displayName: 'Build and push an image to ACR' # Azure DevOps 로그에 표시될 이 단계의 이름
+  inputs:
+    # ACR에 로그인하고 이미지를 푸시할 때 사용할 서비스 연결의 이름입니다.
+    # 이 이름은 '단계 1'에서 여러분이 만드신 'Docker Registry' 타입 서비스 연결 이름과 정확히 일치해야 합니다.
+    containerRegistry: 'takDockerAcr' # << **여러분이 방금 만드신 서비스 연결 이름 (takDockerAcr)!**
+    repository: '$(imageName)' # 위에서 정의한 이미지 이름 변수 사용
+    command: 'buildAndPush' # Docker 빌드와 푸시를 동시에 수행하는 명령어
+    Dockerfile: '$(dockerfilePath)' # 위에서 정의한 Dockerfile 경로 변수 사용
+    tags: '$(tag)' # 위에서 정의한 태그 변수 사용
