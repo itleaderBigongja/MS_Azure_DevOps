@@ -3,6 +3,15 @@
 trigger:
 - master # 여러분의 브랜치 이름이 'master'이므로 여기에 'master'를 입력합니다.
 
+# 30분마다 파이프라인을 자동으로 실행하는 스케줄을 추가합니다.
+schedules:
+- cron: "*/30 * * * *" # 매 30분마다
+  displayName: 'Automatic deployment every 30 minutes' # Azure DevOps UI에 표시될 이름
+  branches:
+    include:
+    - master # master 브랜치에 대해서만 스케줄을 실행합니다.
+  always: true # 새 커밋이 없어도 스케줄에 따라 항상 실행합니다.
+
 # 파이프라인이 실행될 가상 머신(에이전트) 환경을 정의합니다.
 pool:
   vmImage: 'ubuntu-latest'
